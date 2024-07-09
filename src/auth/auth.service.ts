@@ -9,12 +9,15 @@ import { User } from 'src/user/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { MailerService } from '@nestjs-modules/mailer';
+import { nodemailerConfig } from 'src/config/nodemailer.config';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User) private userRepository: Repository<User>,
-    jwtService: JwtService,
+    private jwtService: JwtService,
+    private readonly messageService: MailerService,
   ) {}
 
   async register(createUserRegisterDto: CreateUserRegisterDto) {
@@ -42,6 +45,19 @@ export class AuthService {
 
       const saveResponse = await this.userRepository.save(user);
 
+      const payload = {
+        email,
+        id: saveResponse?.id,
+        fullName: saveResponse?.fullName,
+      };
+
+      const token = await this.jwtService.signAsync(payload);
+
+      await this.sendMail(
+        `Please click on this link to confirm ${process.env.ORIGIN_URL + `?token=${token}`}`,
+        email,
+      );
+
       return saveResponse;
     } catch (error) {
       throw new InternalServerErrorException('Unable to register the user', {
@@ -61,5 +77,14 @@ export class AuthService {
 
   forgotPassword() {
     return [];
+  }
+
+  private async sendMail(message: string, to: string, subject?: string) {
+    this.messageService.sendMail({
+      from: 'Kazi Towfiq <ornonornob@gmail.com>',
+      to,
+      subject: subject || 'Email Confirmation!',
+      text: message,
+    });
   }
 }

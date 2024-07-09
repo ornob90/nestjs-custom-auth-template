@@ -28,7 +28,7 @@ export class AuthController {
   }
 
   @Post('verify')
-  verify() {
+  verify(@Body() ) {
     return this.verify();
   }
 
