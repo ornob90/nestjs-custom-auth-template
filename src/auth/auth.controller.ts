@@ -9,6 +9,7 @@ import {
 import { AuthService } from './auth.service';
 import { CreateUserRegisterDto } from './dto/create-user-register.dto';
 import { User } from 'src/user/user.entity';
+import { CreateUserVerifyDto } from './dto/create-user-verify.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -27,9 +28,9 @@ export class AuthController {
     return this.authService.login(createUserLoginDto);
   }
 
-  @Post('verify')
-  verify(@Body() ) {
-    return this.verify();
+  @Put('activate-account')
+  activateAccount(@Body() createUserVerifyDto: CreateUserVerifyDto) {
+    return this.authService.activateAccount(createUserVerifyDto);
   }
 
   @Post('forgot-password')

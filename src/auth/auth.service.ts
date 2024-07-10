@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateUserRegisterDto } from './dto/create-user-register.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
 import { nodemailerConfig } from 'src/config/nodemailer.config';
+import { CreateUserVerifyDto } from './dto/create-user-verify.dto';
 
 @Injectable()
 export class AuthService {
@@ -71,7 +73,43 @@ export class AuthService {
     return [];
   }
 
-  verify() {
+  async activateAccount(createUserVerifyDto: CreateUserVerifyDto) {
+    try {
+      const { token } = createUserVerifyDto || {};
+
+      const decoded = await this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET_KEY,
+      });
+
+      if (!decoded) {
+        throw new UnauthorizedException('Unauthorize access');
+      }
+
+      const { id } = decoded;
+
+      const curDate = Math.floor(Date.now() / 1000);
+
+      const isExpired = decoded.exp < curDate;
+
+      if (isExpired) {
+        throw new BadRequestException('Token Expired!');
+      }
+
+      const newUser = await this.userRepository.update(id, {
+        currentStatus: 'activated',
+      });
+
+      return {
+        newUser,
+        decoded,
+      };
+    } catch (error) {
+      throw new InternalServerErrorException('Unable to activate the user', {
+        cause: new Error(),
+        description: error.message,
+      });
+    }
+
     return [];
   }
 
