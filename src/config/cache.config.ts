@@ -5,7 +5,10 @@ import { CacheModuleOptions } from '@nestjs/cache-manager';
 
 export const cacheConfig = {
   isGlobal: true,
-  store: redisStore,
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
+  useFactory: async () => ({
+    store: redisStore,
+    host: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT,
+    // ttl: 1000,
+  }),
 };

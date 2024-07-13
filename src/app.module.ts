@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -12,8 +12,11 @@ import { jwtConfig } from './config/jwt.config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { cacheConfig } from './config/cache.config';
 import type { RedisClientOptions } from 'redis';
+import { UserModule } from './user/user.module';
+import * as redisStore from 'cache-manager-redis-store';
 
 import * as dotenv from 'dotenv';
+import { VerifyMiddleware } from './middlewares/verfiy.middleware';
 dotenv.config();
 
 @Module({
@@ -22,11 +25,17 @@ dotenv.config();
     TypeOrmModule.forRoot(mysqlConfig),
     MailerModule.forRoot(nodemailerConfig),
     JwtModule.register(jwtConfig),
-    CacheModule.register<RedisClientOptions>(cacheConfig),
+    // CacheModule.register<RedisClientOptions>(cacheConfig),
+    CacheModule.register(cacheConfig),
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {
+export class AppModule implements NestModule {
   constructor(private dataSource: DataSource) {}
+
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(VerifyMiddleware).forRoutes('user/:id');
+  }
 }

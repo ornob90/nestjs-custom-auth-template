@@ -87,10 +87,17 @@ export class AuthService {
         throw new NotFoundException('User not registered');
       }
 
-      const isPasswordMatched = await bcrypt.compare(user.password, password);
+      if (user.currentStatus !== 'activated') {
+        throw new UnauthorizedException('User not activated!');
+      }
+
+      const isPasswordMatched = await bcrypt.compare(password, user.password);
 
       if (!isPasswordMatched) {
-        throw new UnauthorizedException('Invalid password');
+        throw new UnauthorizedException('Invalid password', {
+          cause: new Error(),
+          description: 'Unable to login',
+        });
       }
 
       const payload = {
@@ -105,12 +112,15 @@ export class AuthService {
 
       await this.cacheManager.set(`${user.id}`, token, this.sevenDaysExpire);
 
+      const savedToken = await this.cacheManager.get(`${user.id}`);
+
       return {
         success: true,
         token,
+        savedToken,
       };
     } catch (error) {
-      throw new InternalServerErrorException('Unable to activate the user', {
+      throw new InternalServerErrorException('Login Failed', {
         cause: new Error(),
         description: error.message,
       });
