@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateUserRegisterDto } from './dto/create-user-register.dto';
@@ -13,10 +15,16 @@ import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
 import { nodemailerConfig } from 'src/config/nodemailer.config';
 import { CreateUserVerifyDto } from './dto/create-user-verify.dto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { CreateUserLoginDto } from './dto/create-user-logn.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly sevenDaysExpire = 7 * 24 * 60 * 60;
+
   constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectRepository(User) private userRepository: Repository<User>,
     private jwtService: JwtService,
     private readonly messageService: MailerService,
@@ -69,8 +77,44 @@ export class AuthService {
     }
   }
 
-  login(createUserLoginDto) {
-    return [];
+  async login(createUserLoginDto: CreateUserLoginDto) {
+    try {
+      const { email, password } = createUserLoginDto;
+
+      const user = await this.userRepository.findOneBy({ email });
+
+      if (!user) {
+        throw new NotFoundException('User not registered');
+      }
+
+      const isPasswordMatched = await bcrypt.compare(user.password, password);
+
+      if (!isPasswordMatched) {
+        throw new UnauthorizedException('Invalid password');
+      }
+
+      const payload = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+      };
+
+      const token = this.jwtService.sign(payload, {
+        expiresIn: '7d',
+      });
+
+      await this.cacheManager.set(`${user.id}`, token, this.sevenDaysExpire);
+
+      return {
+        success: true,
+        token,
+      };
+    } catch (error) {
+      throw new InternalServerErrorException('Unable to activate the user', {
+        cause: new Error(),
+        description: error.message,
+      });
+    }
   }
 
   async activateAccount(createUserVerifyDto: CreateUserVerifyDto) {
@@ -95,13 +139,32 @@ export class AuthService {
         throw new BadRequestException('Token Expired!');
       }
 
+      const user = await this.userRepository.findOneBy(id);
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (!user?.currentStatus && user?.currentStatus === 'activated') {
+        throw new BadRequestException('User already activated');
+      }
+
       const newUser = await this.userRepository.update(id, {
         currentStatus: 'activated',
       });
 
+      const payload = {
+        email: decoded.email,
+        id: decoded?.id,
+        fullName: decoded?.fullName,
+      };
+
+      const newToken = await this.jwtService.signAsync(payload);
+
+      await this.cacheManager.set(decoded.id, newToken, this.sevenDaysExpire);
+
       return {
-        newUser,
-        decoded,
+        token: newToken,
       };
     } catch (error) {
       throw new InternalServerErrorException('Unable to activate the user', {
@@ -109,8 +172,6 @@ export class AuthService {
         description: error.message,
       });
     }
-
-    return [];
   }
 
   forgotPassword() {

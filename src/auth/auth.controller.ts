@@ -3,6 +3,7 @@ import {
   Controller,
   Post,
   Put,
+  UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { AuthService } from './auth.service';
 import { CreateUserRegisterDto } from './dto/create-user-register.dto';
 import { User } from 'src/user/user.entity';
 import { CreateUserVerifyDto } from './dto/create-user-verify.dto';
+import { CreateUserLoginDto } from './dto/create-user-logn.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -24,7 +26,7 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() createUserLoginDto) {
+  login(@Body() createUserLoginDto: CreateUserLoginDto) {
     return this.authService.login(createUserLoginDto);
   }
 

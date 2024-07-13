@@ -9,6 +9,12 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { nodemailerConfig } from './config/nodemailer.config';
 import { JwtModule } from '@nestjs/jwt';
 import { jwtConfig } from './config/jwt.config';
+import { CacheModule } from '@nestjs/cache-manager';
+import { cacheConfig } from './config/cache.config';
+import type { RedisClientOptions } from 'redis';
+
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 @Module({
   imports: [
@@ -16,6 +22,7 @@ import { jwtConfig } from './config/jwt.config';
     TypeOrmModule.forRoot(mysqlConfig),
     MailerModule.forRoot(nodemailerConfig),
     JwtModule.register(jwtConfig),
+    CacheModule.register<RedisClientOptions>(cacheConfig),
   ],
   controllers: [AppController],
   providers: [AppService],
