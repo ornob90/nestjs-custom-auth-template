@@ -22,6 +22,7 @@ import { CreateUserLoginDto } from './dto/create-user-logn.dto';
 @Injectable()
 export class AuthService {
   private readonly sevenDaysExpire = 7 * 24 * 60 * 60;
+  private readonly hourExpire = 60 * 60;
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -61,7 +62,15 @@ export class AuthService {
         fullName: saveResponse?.fullName,
       };
 
-      const token = await this.jwtService.signAsync(payload);
+      const token = await this.jwtService.signAsync(payload, {
+        expiresIn: '1h',
+      });
+
+      await this.cacheManager.set(
+        `${saveResponse.id}_email_token`,
+        token,
+        this.hourExpire,
+      );
 
       await this.sendMail(
         `Please click on this link to confirm ${process.env.ORIGIN_URL + `?token=${token}`}`,
@@ -112,12 +121,11 @@ export class AuthService {
 
       await this.cacheManager.set(`${user.id}`, token, this.sevenDaysExpire);
 
-      const savedToken = await this.cacheManager.get(`${user.id}`);
+      // const savedToken = await this.cacheManager.get(`${user.id}`);
 
       return {
         success: true,
         token,
-        savedToken,
       };
     } catch (error) {
       throw new InternalServerErrorException('Login Failed', {
@@ -149,6 +157,12 @@ export class AuthService {
         throw new BadRequestException('Token Expired!');
       }
 
+      const tokenFromRedis = await this.cacheManager.get(`${id}_email_token`);
+
+      if (!tokenFromRedis || token !== tokenFromRedis) {
+        throw new BadRequestException('Invalid Token');
+      }
+
       const user = await this.userRepository.findOneBy(id);
 
       if (!user) {
@@ -159,7 +173,7 @@ export class AuthService {
         throw new BadRequestException('User already activated');
       }
 
-      const newUser = await this.userRepository.update(id, {
+      await this.userRepository.update(id, {
         currentStatus: 'activated',
       });
 
@@ -172,9 +186,11 @@ export class AuthService {
       const newToken = await this.jwtService.signAsync(payload);
 
       await this.cacheManager.set(decoded.id, newToken, this.sevenDaysExpire);
+      await this.cacheManager.del(`${id}_email_token`);
 
       return {
         token: newToken,
+        user: payload,
       };
     } catch (error) {
       throw new InternalServerErrorException('Unable to activate the user', {
