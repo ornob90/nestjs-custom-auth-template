@@ -11,9 +11,10 @@ import { JwtService } from '@nestjs/jwt';
 import { jwtConfig } from 'src/config/jwt.config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Session } from 'src/types/auth.types';
 
-interface VerifyResponse extends Response {
-  user: string;
+export interface VerifyRequest extends Request {
+  user: Session;
 }
 
 @Injectable()
@@ -23,7 +24,7 @@ export class VerifyMiddleware implements NestMiddleware {
     private jwtService: JwtService,
   ) {}
 
-  async use(req: Request, res: VerifyResponse, next: NextFunction) {
+  async use(req: VerifyRequest, res: Response, next: NextFunction) {
     try {
       const { authorization } = req.headers;
 
@@ -41,7 +42,9 @@ export class VerifyMiddleware implements NestMiddleware {
 
       //   console.log({ decoded });
 
-      const tokenFromMemory = await this.cacheManager.get(`${decoded.id}`);
+      const tokenFromMemory = await this.cacheManager.get(
+        `${decoded.id}_access_token`,
+      );
 
       if (!tokenFromMemory) {
         throw new UnauthorizedException('Unauthorize Access6');
@@ -57,7 +60,7 @@ export class VerifyMiddleware implements NestMiddleware {
         throw new UnauthorizedException('Unauthorize Access4');
       }
 
-      res.user = decoded;
+      req.user = decoded || {};
 
       next();
     } catch (error) {

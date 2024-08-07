@@ -36,6 +36,8 @@ export class AppModule implements NestModule {
   constructor(private dataSource: DataSource) {}
 
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(VerifyMiddleware).forRoutes('user/:id');
+    consumer
+      .apply(VerifyMiddleware)
+      .forRoutes('user/:id', 'auth/session', '/auth/logout');
   }
 }
